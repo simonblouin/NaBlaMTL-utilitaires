@@ -9,6 +9,12 @@ import pandas as pd
 import re
 import sys
 
+# Pour tracer des spectres issus de plusieurs fichiers distincts, utiliser
+# la commande suivant:
+#
+# python explore_synth.py fichier1 fichier2 fichier3
+
+
 filelist = sys.argv[1:]
 
 ################

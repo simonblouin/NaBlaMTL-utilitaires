@@ -5,4 +5,5 @@ Utilitaires Python pour l'analyse et la visualisation de données relatives aux
 Package créé par Simon Blouin en collaboration avec François Hardy
 """
 
-import fortranformat
+from .explore_synth import explore_synth
+from .model_analysis import model_analysis

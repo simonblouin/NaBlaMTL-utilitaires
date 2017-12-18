@@ -3,11 +3,14 @@ from bokeh.models import CustomJS, ColumnDataSource, Slider, DataRange1d
 from bokeh.plotting import Figure, output_file, show
 from bokeh.palettes import Dark2_8
 from bokeh.models.widgets import Toggle
+from astropy.io import fits
 import csv
 import numpy as np
 import pandas as pd
 import re
 import sys
+
+from . import __constants__ as sc
 
 
 def spectre_test62(f):
@@ -77,7 +80,7 @@ def spectre_tsv3(f):
     
     
 def spectre_sdss_fits(f):
-    hdul = fits.open(synth_file)
+    hdul = fits.open(f)
     
     if 'SDSS' in hdul[0].header['TELESCOP']:
         # .fits from SDSS
@@ -131,6 +134,7 @@ def spec_info(inputfile,imodel,inu,teff):
 
 def plot_spectre(filelist):
     for i,inputfile in enumerate(filelist):
+    
         if inputfile.endswith('fits'):
             wav, flux = spectre_sdss_fits(inputfile)
             imodel = False
@@ -170,37 +174,37 @@ def plot_spectre(filelist):
             else:
                 print('Erreur dans plot_spectre')
                 print('Format inconnu pour '+inputfile)
-                
             
             flux = np.array([float(ff) for ff in flux])
-            # Detection des unites
-            if not imodel and np.mean(flux)<1e-20:
-                inu = True
-            # Conversion de f_lambda a f_nu
-            if not inu:
-                flux *= wav*wav/1e8/2.998e10
-            # Save data to pd dataframe
-            x = wav
-            y = flux
-            if i==0:
-                xmin = np.min(x)
-                xmax = np.max(x)
-            else:
-                nxmin = np.min(x)
-                nxmax = np.max(x)
-                if(nxmin > xmin): xmin = nxmin
-                if(nxmax < xmax): xmax = nxmax
-            teff = (-np.trapz(y,x=2.997e18/x)/5.678e-5*4.0*np.pi)**0.25
-            spec_info(inputfile,imodel,inu,teff)
-            if i==0:
-                d = {'x'+inputfile: x, 'y'+inputfile: y, 
-                     'x'+inputfile+'save': x, 'y'+inputfile+'save': y}
-                df = pd.DataFrame(d)
-            else:
-                d = {'x'+inputfile: x, 'y'+inputfile: y, 
-                     'x'+inputfile+'save': x, 'y'+inputfile+'save': y}
-                dfp = pd.DataFrame(d)
-                df = pd.concat([df,dfp], ignore_index=False, axis=1)
+        
+        # Detection des unites
+        if not imodel and np.mean(flux)<1e-20:
+            inu = True
+        # Conversion de f_lambda a f_nu
+        if not inu:
+            flux *= wav*wav/sc.c_ang
+        # Save data to pd dataframe
+        x = wav
+        y = flux
+        if i==0:
+            xmin = np.min(x)
+            xmax = np.max(x)
+        else:
+            nxmin = np.min(x)
+            nxmax = np.max(x)
+            if(nxmin > xmin): xmin = nxmin
+            if(nxmax < xmax): xmax = nxmax
+        teff = (-np.trapz(y,x=sc.c_ang/x)/sc.sigma*4.0*np.pi)**0.25
+        spec_info(inputfile,imodel,inu,teff)
+        if i==0:
+            d = {'x'+inputfile: x, 'y'+inputfile: y, 
+                 'x'+inputfile+'save': x, 'y'+inputfile+'save': y}
+            df = pd.DataFrame(d)
+        else:
+            d = {'x'+inputfile: x, 'y'+inputfile: y, 
+                 'x'+inputfile+'save': x, 'y'+inputfile+'save': y}
+            dfp = pd.DataFrame(d)
+            df = pd.concat([df,dfp], ignore_index=False, axis=1)
 
     # Bokeh callbacks
     d = {'inorm': [0,4500]}

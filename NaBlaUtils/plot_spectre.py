@@ -9,26 +9,101 @@ import pandas as pd
 import re
 import sys
 
-# Pour tracer des spectres issus de plusieurs fichiers distincts, utiliser
-# la commande suivant:
-#
-# python explore_synth.py fichier1 fichier2 fichier3
+def spectre_test62(f):
+    """ Lecture d'un fichier spectre synthetique de test62 """
+    wav = []
+    flux = []
+    end = False
+    prevwav = 0
+    while not end:
+        try:
+            line = re.findall('([\d\s]*\.\d{2})',f.readline())
+            wavnew = [float(w) for w in line]
+            if(wavnew[-1] <= prevwav):
+                end = True
+            else:
+                wav = np.append(wav,wavnew)
+                prevwav = wavnew[-1]
+        except:
+            end = True
+    aflux = f.readlines()
+    for line in aflux:
+        line = re.sub('-10\d', 'e-100', line)
+        flux = np.append(flux, line.rstrip().split())
+    return wav,flux
 
+def spectre_csv(f):
+    """ Lecture d'un fichier spectre d'un fichier csv en 2 colonnes """
+    wav = []
+    flux = []
+    reader = csv.reader(f)
+    for row in reader:
+        if row:
+            wavnew, fluxnew = row
+            wav = np.append(wav, float(wavnew))
+            flux = np.append(flux, float(fluxnew))
+    return wav,flux
 
-# filelist = sys.argv[1:]
+def spectre_tsv(f):
+    """ Lecture d'un fichier spectre en 2 colonnes """
+    wav = []
+    flux = []
+    end = False
+    while not end:
+        try:
+            line = f.readline().split()
+            wavnew, fluxnew = line
+            wav = np.append(wav,float(wavnew))
+            flux = np.append(flux,float(fluxnew))
+        except:
+            end = True
+    return wav,flux
 
-def explore_synth(filelist):
+def spectre_tsv3(f):
+    """ Lecture d'un fichier spectre en 3 colonnes (avec incertitudes sur flux)"""
+    while not end:
+        try:
+            line = f.readline().split()
+            wavnew, fluxnew, _  = line
+            wav = np.append(wav,float(wavnew))
+            flux = np.append(flux,float(fluxnew))
+        except:
+            end = True
+    return wav,flux
 
-    ################
-    ### (1) Load ###
-    ################
+def spectre_etrange(f):
+    """ Lecture d'un fichier spectre Fortran imprime en 5 ou 7 colonnes """
+    while not end:
+        try:
+            line = f.readline().split()
+            wavnew = [float(w) for w in line]
+            wav = np.append(wav,wavnew)
+            prevwav = wavnew[-1]
+        except:
+            end = True
+            aflux = f.readlines()
+            for line in aflux:
+                line = re.sub('-10\d', 'e-100', line)
+                flux = np.append(flux, line.rstrip().split())
+    return wav,flux
 
+def spec_info(inputfile,imodel,inu,teff):
+    if imodel:
+        types = 'modele'
+    else:
+        types = 'observation'
+    if inu:
+        unites = 'f_nu'
+    else:
+        unites = 'f_lambda'
+    print(inputfile+' interprete comme '+types+' en '+unites)
+    if imodel:
+        print('Teff = '+str(int(teff)))
+
+def plot_spectre(filelist):
     for i,inputfile in enumerate(filelist):
-        wav = []
-        flux = []
-        end = False
-        prevwav = 0
         with open(inputfile) as f:
+            # Lecture du header
             try:
                 nn = int(f.tell())
                 f.readline()
@@ -37,72 +112,40 @@ def explore_synth(filelist):
             ref = f.tell()
             test = f.readline()
             f.seek(ref)
-            if (len(test.split())==10) or (len(test.split())==6): # Case 1: atmo.f output
-                print('Format test62.f detecte')
-                while not end:
-                    try:
-                        line = re.findall('([\d\s]*\.\d{2})',f.readline())
-                        wavnew = [float(w) for w in line]
-                        if(wavnew[-1] <= prevwav):
-                            end = True
-                        else:
-                            wav = np.append(wav,wavnew)
-                            prevwav = wavnew[-1]
-                    except:
-                        end = True
-                aflux = f.readlines()
-                for line in aflux:
-                    line = re.sub('-10\d', 'e-100', line)
-                    flux = np.append(flux, line.rstrip().split())
-
-            elif(len(test.split(','))==2): # Case 2: csv file
-                print('Format csv detecte')
-                reader = csv.reader(f)
-                for row in reader:
-                    if row:
-                        wavnew, fluxnew = row
-                        wav = np.append(wav, float(wavnew))
-                        flux = np.append(flux, float(fluxnew))
-
-            elif(len(test.split())==2): # Case 2: tsv file
-                print('Format tsv detecte')
-                while not end:
-                    try:
-                        line = f.readline().split()
-                        wavnew, fluxnew = line
-                        wav = np.append(wav,float(wavnew))
-                        flux = np.append(flux,float(fluxnew))
-                    except:
-                        end = True
-                        
-            elif(len(test.split())==3): # Case 3: 3rd column=sigma
-                print('Format avec incertitudes detecte')
-                while not end:
-                    try:
-                        line = f.readline().split()
-                        wavnew, fluxnew, _  = line
-                        wav = np.append(wav,float(wavnew))
-                        flux = np.append(flux,float(fluxnew))
-                    except:
-                        end = True
-
-            elif(len(test.split())==5 or len(test.split())==7): # Case 4: weird format
-                print('Format etrange detecte')
-                while not end:
-                    try:
-                        line = f.readline().split()
-                        wavnew = [float(w) for w in line]
-                        wav = np.append(wav,wavnew)
-                        prevwav = wavnew[-1]
-                    except:
-                        end = True
-                aflux = f.readlines()
-                for line in aflux:
-                    line = re.sub('-10\d', 'e-100', line)
-                    flux = np.append(flux, line.rstrip().split())
-
+            # Lecture des donnees
+            if (len(test.split())==10) or (len(test.split())==6): # test62
+                wav, flux = spectre_test62(f) 
+                imodel = True
+                inu = True
+            elif(len(test.split(','))==2): # csv
+                wav, flux = spectre_csv(f)
+                imodel = False
+                inu = False
+            elif(len(test.split())==2): # tsv
+                wav, flux = spectre_tsv(f)
+                imodel = False
+                inu = False
+            elif(len(test.split())==3): # tsv avec incertitudes
+                wav, flux = spectre_tsv3(f)
+                imodel = False
+                inu = False
+            elif(len(test.split())==5 or len(test.split())==7): # format etrange
+                wav, flux = spectre_etrange(f)
+                imodel = False
+                inu = False
+            else:
+                print('Erreur dans plot_spectre')
+                print('Format inconnu pour '+inputfile)
+            flux = np.array([float(ff) for ff in flux])
+            # Detection des unites
+            if not imodel and np.mean(flux)<1e-20:
+                inu = True
+            # Conversion de f_lambda a f_nu
+            if not inu:
+                flux *= wav*wav/1e8/2.998e10
             # Save data to pd dataframe
             x = wav
+            y = flux
             if i==0:
                 xmin = np.min(x)
                 xmax = np.max(x)
@@ -111,8 +154,8 @@ def explore_synth(filelist):
                 nxmax = np.max(x)
                 if(nxmin > xmin): xmin = nxmin
                 if(nxmax < xmax): xmax = nxmax
-            y = [float(ff) for ff in flux]
-            print((-np.trapz(y,x=2.997e18/x)/5.678e-5*4.0*np.pi)**0.25)
+            teff = (-np.trapz(y,x=2.997e18/x)/5.678e-5*4.0*np.pi)**0.25
+            spec_info(inputfile,imodel,inu,teff)
             if i==0:
                 d = {'x'+inputfile: x, 'y'+inputfile: y, 
                      'x'+inputfile+'save': x, 'y'+inputfile+'save': y}
@@ -123,10 +166,7 @@ def explore_synth(filelist):
                 dfp = pd.DataFrame(d)
                 df = pd.concat([df,dfp], ignore_index=False, axis=1)
 
-    #####################
-    ### (2) Callbacks ###
-    #####################
-
+    # Bokeh callbacks
     d = {'inorm': [0,4500]}
     dfp = pd.DataFrame(d)
     df = pd.concat([df,dfp], ignore_index=False, axis=1)
@@ -191,14 +231,10 @@ def explore_synth(filelist):
                     y[i] = ys[i]
             source.trigger('change')
 
-
-    ################
-    ### (3) Plot ###
-    ################
-
+    # Bokeh plot
     plot = Figure(tools="pan,wheel_zoom,box_zoom,reset,previewsave",
                   plot_width=1000,plot_height=800,
-                  x_axis_label='Lambda (A)', y_axis_label='Flux')
+                  x_axis_label='Lambda (A)', y_axis_label='Flux F_nu')
     plot.x_range = DataRange1d(start=xmin, end=xmax) 
     for i,inputfile in enumerate(filelist):
         plot.line('x'+inputfile, 'y'+inputfile, source=source, 

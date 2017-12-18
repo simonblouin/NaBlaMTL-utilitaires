@@ -8,5 +8,5 @@ def get_MWDD_info(name):
             namelist = entry['allnames']+entry['wdid']+entry['name']
         except KeyError:
             namelist = entry['allnames']+entry['wdid']
-        if name.lower() in namelist.lower():
+        if name.lower().replace(' ', '') in namelist.lower().replace(' ', ''):
             return entry

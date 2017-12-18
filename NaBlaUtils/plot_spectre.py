@@ -9,6 +9,7 @@ import pandas as pd
 import re
 import sys
 
+
 def spectre_test62(f):
     """ Lecture d'un fichier spectre synthetique de test62 """
     wav = []
@@ -31,6 +32,7 @@ def spectre_test62(f):
         line = re.sub('-10\d', 'e-100', line)
         flux = np.append(flux, line.rstrip().split())
     return wav,flux
+    
 
 def spectre_csv(f):
     """ Lecture d'un fichier spectre d'un fichier csv en 2 colonnes """
@@ -43,6 +45,7 @@ def spectre_csv(f):
             wav = np.append(wav, float(wavnew))
             flux = np.append(flux, float(fluxnew))
     return wav,flux
+    
 
 def spectre_tsv(f):
     """ Lecture d'un fichier spectre en 2 colonnes """
@@ -58,6 +61,7 @@ def spectre_tsv(f):
         except:
             end = True
     return wav,flux
+    
 
 def spectre_tsv3(f):
     """ Lecture d'un fichier spectre en 3 colonnes (avec incertitudes sur flux)"""
@@ -70,6 +74,29 @@ def spectre_tsv3(f):
         except:
             end = True
     return wav,flux
+    
+    
+def spectre_sdss_fits(f)
+    hdul = fits.open(synth_file)
+    
+    if 'SDSS' in hdul[0].header['TELESCOP']:
+        # .fits from SDSS
+        data = hdul[1].data
+        
+        # log10(wav) dans les .fits
+        wav = 10.**data.field(1) # Angstrom
+        
+        # flux F_lambda en unités de 1e-17 erg/...
+        flux = data.field(0)*1e-17 # erg/cm^2/s/Ang
+        
+        # c_ang = vitesse de la lumière en angstrom / s
+        flux *= wav**2/sc.c_ang # erg/cm^2/s/Hz
+        
+        return wav, flux
+            
+    else:
+        raise Exception('.fits format inconnu')
+    
 
 def spectre_etrange(f):
     """ Lecture d'un fichier spectre Fortran imprime en 5 ou 7 colonnes """
@@ -86,6 +113,7 @@ def spectre_etrange(f):
                 line = re.sub('-10\d', 'e-100', line)
                 flux = np.append(flux, line.rstrip().split())
     return wav,flux
+    
 
 def spec_info(inputfile,imodel,inu,teff):
     if imodel:
@@ -99,10 +127,16 @@ def spec_info(inputfile,imodel,inu,teff):
     print(inputfile+' interprete comme '+types+' en '+unites)
     if imodel:
         print('Teff = '+str(int(teff)))
+        
 
 def plot_spectre(filelist):
     for i,inputfile in enumerate(filelist):
-        with open(inputfile) as f:
+        if inputfile.endswith('fits'):
+            wav, flux = spectre_sdss_fits(inputfile)
+            imodel = False
+            inu = True
+        else:
+            f = open(inputfile, 'r')
             # Lecture du header
             try:
                 nn = int(f.tell())
@@ -136,6 +170,8 @@ def plot_spectre(filelist):
             else:
                 print('Erreur dans plot_spectre')
                 print('Format inconnu pour '+inputfile)
+                
+            
             flux = np.array([float(ff) for ff in flux])
             # Detection des unites
             if not imodel and np.mean(flux)<1e-20:

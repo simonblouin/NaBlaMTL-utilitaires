@@ -76,7 +76,7 @@ def spectre_tsv3(f):
     return wav,flux
     
     
-def spectre_sdss_fits(f)
+def spectre_sdss_fits(f):
     hdul = fits.open(synth_file)
     
     if 'SDSS' in hdul[0].header['TELESCOP']:

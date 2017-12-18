@@ -1,14 +1,9 @@
-from bokeh.layouts import column
-from bokeh.models import CustomJS, ColumnDataSource, Slider, DataRange1d
-from bokeh.plotting import Figure, output_file, show
-from bokeh.palettes import Dark2_8
-from bokeh.models.widgets import Toggle
+import numpy as np
+import matplotlib.pyplot as plt
 from astropy.io import fits
 import csv
-import numpy as np
-import pandas as pd
 import re
-import sys
+from os.path import basename
 
 from . import __constants__ as sc
 
@@ -80,6 +75,7 @@ def spectre_tsv3(f):
     
     
 def spectre_sdss_fits(f):
+    """ Lecture d'un fichier spectre .fits du SDSS """
     hdul = fits.open(f)
     
     if 'SDSS' in hdul[0].header['TELESCOP']:
@@ -93,7 +89,7 @@ def spectre_sdss_fits(f):
         flux = data.field(0)*1e-17 # erg/cm^2/s/Ang
         
         # c_ang = vitesse de la lumière en angstrom / s
-        flux *= wav**2/sc.c_ang # erg/cm^2/s/Hz
+        # flux *= wav**2/sc.c_ang # erg/cm^2/s/Hz
         
         return wav, flux
             
@@ -131,51 +127,74 @@ def spec_info(inputfile,imodel,inu,teff):
     if imodel:
         print('Teff = '+str(int(teff)))
         
+        
+def load_spectre(inputfile):
+    
+    if inputfile.endswith('fits'):
+        wav, flux = spectre_sdss_fits(inputfile)
+        imodel = False
+        inu = False
+    else:
+        f = open(inputfile, 'r')
+        # Lecture du header
+        try:
+            nn = int(f.tell())
+            f.readline()
+        except:
+            pass
+        ref = f.tell()
+        test = f.readline()
+        f.seek(ref)
+        # Lecture des donnees
+        if (len(test.split())==10) or (len(test.split())==6): # test62
+            wav, flux = spectre_test62(f) 
+            imodel = True
+            inu = True
+        elif(len(test.split(','))==2): # csv
+            wav, flux = spectre_csv(f)
+            imodel = False
+            inu = False
+        elif(len(test.split())==2): # tsv
+            wav, flux = spectre_tsv(f)
+            imodel = False
+            inu = False
+        elif(len(test.split())==3): # tsv avec incertitudes
+            wav, flux = spectre_tsv3(f)
+            imodel = False
+            inu = False
+        elif(len(test.split())==5 or len(test.split())==7): # format etrange
+            wav, flux = spectre_etrange(f)
+            imodel = False
+            inu = False
+        else:
+            print('Erreur dans plot_spectre')
+            print('Format inconnu pour '+inputfile)
+        flux = np.array([float(ff) for ff in flux])
+        
+    return wav, flux, (imodel, inu)
 
-def plot_spectre(filelist):
+        
+def normalisation(wav, flux, wav_norm = 5000):
+    """ Normalisation du spectre à wav_norm, afin d'avoir le tout
+        sous le même ordre de grandeur"""
+
+    flux_norm = flux[wav>wav_norm][0]
+    
+    return flux / flux_norm
+        
+
+def plot_spectre(filelist, figname = None):
+
+    # Matplotlib plots
+    fig, ax = plt.subplots()
+    ax.minorticks_on()
+    
+    ax.set_xlabel('Longueur d\'onde ' + r'($\AA$)')
+    ax.set_ylabel(r'$F_\nu$ ' + '(normalisé)')
+
     for i,inputfile in enumerate(filelist):
     
-        if inputfile.endswith('fits'):
-            wav, flux = spectre_sdss_fits(inputfile)
-            imodel = False
-            inu = True
-        else:
-            f = open(inputfile, 'r')
-            # Lecture du header
-            try:
-                nn = int(f.tell())
-                f.readline()
-            except:
-                pass
-            ref = f.tell()
-            test = f.readline()
-            f.seek(ref)
-            # Lecture des donnees
-            if (len(test.split())==10) or (len(test.split())==6): # test62
-                wav, flux = spectre_test62(f) 
-                imodel = True
-                inu = True
-            elif(len(test.split(','))==2): # csv
-                wav, flux = spectre_csv(f)
-                imodel = False
-                inu = False
-            elif(len(test.split())==2): # tsv
-                wav, flux = spectre_tsv(f)
-                imodel = False
-                inu = False
-            elif(len(test.split())==3): # tsv avec incertitudes
-                wav, flux = spectre_tsv3(f)
-                imodel = False
-                inu = False
-            elif(len(test.split())==5 or len(test.split())==7): # format etrange
-                wav, flux = spectre_etrange(f)
-                imodel = False
-                inu = False
-            else:
-                print('Erreur dans plot_spectre')
-                print('Format inconnu pour '+inputfile)
-            
-            flux = np.array([float(ff) for ff in flux])
+        wav, flux, (imodel, inu) = load_spectre(inputfile)
         
         # Detection des unites
         if not imodel and np.mean(flux)<1e-20:
@@ -183,106 +202,21 @@ def plot_spectre(filelist):
         # Conversion de f_lambda a f_nu
         if not inu:
             flux *= wav*wav/sc.c_ang
-        # Save data to pd dataframe
-        x = wav
-        y = flux
-        if i==0:
-            xmin = np.min(x)
-            xmax = np.max(x)
-        else:
-            nxmin = np.min(x)
-            nxmax = np.max(x)
-            if(nxmin > xmin): xmin = nxmin
-            if(nxmax < xmax): xmax = nxmax
-        teff = (-np.trapz(y,x=sc.c_ang/x)/sc.sigma*4.0*np.pi)**0.25
+        # Save data to np.array
+
+        teff = (-np.trapz(flux,x=sc.c_ang/wav)/sc.sigma*4.0*np.pi)**0.25
         spec_info(inputfile,imodel,inu,teff)
-        if i==0:
-            d = {'x'+inputfile: x, 'y'+inputfile: y, 
-                 'x'+inputfile+'save': x, 'y'+inputfile+'save': y}
-            df = pd.DataFrame(d)
-        else:
-            d = {'x'+inputfile: x, 'y'+inputfile: y, 
-                 'x'+inputfile+'save': x, 'y'+inputfile+'save': y}
-            dfp = pd.DataFrame(d)
-            df = pd.concat([df,dfp], ignore_index=False, axis=1)
+        
+        flux = normalisation(wav, flux)
+        # ax.plot(wav, flux, label = inputfile[inputfile.rindex('\\')+1:])
+        ax.plot(wav, flux, label = basename(inputfile))
+        
+    ax.legend()
+    
+    if figname is None:
+        plt.show(fig)
+    else:
+        fig.savefig(figname)
+    plt.close(fig)
+        
 
-    # Bokeh callbacks
-    d = {'inorm': [0,4500]}
-    dfp = pd.DataFrame(d)
-    df = pd.concat([df,dfp], ignore_index=False, axis=1)
-
-    d = {'filelist': np.insert(filelist,0,len(filelist))}
-    dfp = pd.DataFrame(d)
-    df = pd.concat([df,dfp], ignore_index=False, axis=1)
-
-    source = ColumnDataSource(data=df)
-
-    def slider_CB(source=source, window=None):
-        data = source.data
-        f = float(cb_obj.value)
-        inorm = data['inorm']
-        data['inorm'][1] = f
-        filelist = data['filelist']
-        for j in range(int(filelist[0])):
-            x, y = data['x'+filelist[j+1]], data['y'+filelist[j+1]]
-            xs, ys = data['x'+filelist[j+1]+'save'], data['y'+filelist[j+1]+'save']
-            distmin = 1e4
-            if(data['inorm'][0]==1):
-                for i in range(len(xs)):
-                    dist = abs(xs[i]-f)
-                    if(dist < distmin):
-                        ind = i
-                        distmin = dist
-                indref = data['inorm'][1]
-                indref = ind
-                for i in range(len(xs)):
-                    y[i] = ys[i]/ys[ind]
-            else:
-                for i in range(len(xs)):
-                    y[i] = ys[i]
-            source.trigger('change')
-
-    def norm_CB(source=source, window=None):
-        data = source.data
-        inorm = data['inorm']
-        if inorm[0]==1:
-            inorm[0] = 0
-        elif inorm[0]==0:
-            inorm[0] = 1
-        source.trigger('change')
-        filelist = data['filelist']
-        f = data['inorm'][1]
-        for j in range(int(filelist[0])):
-            x, y = data['x'+filelist[j+1]], data['y'+filelist[j+1]]
-            xs, ys = data['x'+filelist[j+1]+'save'], data['y'+filelist[j+1]+'save']
-            distmin = 1e4
-            if(data['inorm'][0]==1):
-                for i in range(len(xs)):
-                    dist = abs(xs[i]-f)
-                    if(dist < distmin):
-                        ind = i
-                        distmin = dist
-                        indref = data['inorm'][1]
-                indref = ind
-                for i in range(len(xs)):
-                    y[i] = ys[i]/ys[ind]
-            else:
-                for i in range(len(xs)):
-                    y[i] = ys[i]
-            source.trigger('change')
-
-    # Bokeh plot
-    plot = Figure(tools="pan,wheel_zoom,box_zoom,reset,previewsave",
-                  plot_width=1000,plot_height=800,
-                  x_axis_label='Lambda (A)', y_axis_label='Flux F_nu')
-    plot.x_range = DataRange1d(start=xmin, end=xmax) 
-    for i,inputfile in enumerate(filelist):
-        plot.line('x'+inputfile, 'y'+inputfile, source=source, 
-                  line_width=3, line_alpha=0.9, line_color=Dark2_8[i],
-                  legend=inputfile)
-    slider = Slider(start=2000, end=8000, value=5000, step=100, title="Normalization wavelength",
-                    callback=CustomJS.from_py_func(slider_CB))
-    button = Toggle(label="Normalize", name="1", callback=CustomJS.from_py_func(norm_CB))
-    layout = column(button, slider, plot)
-
-    show(layout)

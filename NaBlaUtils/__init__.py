@@ -5,5 +5,5 @@ Utilitaires Python pour l'analyse et la visualisation de données relatives aux
 Package créé par Simon Blouin en collaboration avec François Hardy
 """
 
-from .plot_spectre import plot_spectre
+from .plot_spectre import plot_spectre, load_data
 from .model_analysis import model_analysis

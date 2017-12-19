@@ -2,7 +2,7 @@ import json
 
 def get_MWDD_info(name):
     """ Retourne un dict avec les parametres de l'etoile donnee en input """
-    data = json.load(open('MWDD_table.json'))
+    data = json.load(open('MWDD_table.json', encoding='latin1'))
     for entry in data['data']:
         try:
             namelist = entry['allnames']+entry['wdid']+entry['name']

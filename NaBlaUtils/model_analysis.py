@@ -4,7 +4,7 @@ import pylab
 import os
 import sys
 
-# Ce script créeplusieurs fichiers pdf pour illustrer la structure d'un modele
+# Ce script crée plusieurs fichiers pdf pour illustrer la structure d'un modele
 # Utiliser la commande suivante pour comparer plusieurs structures:
 #
 # python model_analysis.py fichier1 fichier2 fichier3

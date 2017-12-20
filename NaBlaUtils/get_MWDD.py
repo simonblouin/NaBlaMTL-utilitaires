@@ -1,9 +1,12 @@
+import numpy as np
 import json
 from urllib.request import urlopen
+import pkg_resources
 
 def get_MWDD_info(name):
     """ Retourne un dict avec les parametres de l'etoile donnee en input """
-    data = json.load(open('MWDD_table.json', encoding='latin1'))
+    MWDD_table = pkg_resources.resource_stream(__name__, 'MWDD_table.json')
+    data = json.load(MWDD_table)
     for entry in data['data']:
         try:
             namelist = entry['allnames']+entry['wdid']+entry['name']
@@ -31,23 +34,26 @@ def get_MWDD_spectra(name):
         yvec = []
         s = urlopen(site+wdid.replace(' ', '%20')+'/'+spec).readlines()
         data = [line.decode("utf-8").strip().split(',')  for line in s[2:]]
-        s[1] = s[1].decode("utf-8").strip()
+        s[1] = s[1].decode("utf-8").strip().split(',')
+        # print(s[1])
+        # print(s[1].split(','))
         for line in data:
-            if s[1]=='wavelength,flux':
+            if len(s[1])==2: # wavelength,flux
                 x, y = tuple(line)
                 x = float(x)
                 y = float(y)
-            elif s[1]=='wavelength,flux,sigma':
+            elif len(s[1])==3: # wavelength,flux,sigma
                 x, y, _ = tuple(line)
                 x = float(x)
                 y = float(y)
-            elif s[1]=='wavelength,flux,sigma,flag':
+            elif len(s[1])==4: # wavelength,flux,sigma,flag
                 x, y, _, _ = tuple(line)
                 x = float(x)
                 y = float(y)
             else:
                 print('Format inconnu '+spec)
+                pass
             xvec.append(x)
             yvec.append(y)
-        output[spec.replace('%20', '_')] = [xvec,yvec]
+        output[spec.replace('%20', '_')] = np.array([xvec,yvec])
     return output

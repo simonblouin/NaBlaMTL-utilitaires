@@ -1,9 +1,9 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from astropy.io import fits
-import csv
 import re
 from os.path import basename
+import pkg_resources
 
 from . import __constants__ as sc
 from . import fortranformat as ff
@@ -251,12 +251,44 @@ def normalisation(wav, flux):
 
     # flux_norm = flux[wav>wav_norm][0]
     # return flux / flux_norm
+    
+    
+def load_lines():
+    """ Lecture de la liste de raies, et retourne un dict avec l'ion en clé
+        et la liste (array) de raies de cet ion en valeur """
+    
+    linelist = pkg_resources.resource_stream(__name__, 'lines.csv')
+    linedict = {}
+    
+    for line in linelist.readlines():
+        ion, wav = line.split(b',')
+        ion = ion.decode('utf-8')
+        wav = float(wav)
+        try:
+            linedict[ion].append(wav)
+            
+        except KeyError:
+            linedict[ion] = [wav]
+            
+    for ion in linedict:
+        linedict[ion] = np.array(linedict[ion])
+            
+    return linedict
         
 
-def plot_spectre(filelist, figname = None):
+def plot_spectre(filelist, figname = None, IDlines = None):
     """ Trace les spectres dans la liste filelist
         Si figname = None, retourne une fenêtre interactive
-        Si un string est donné, enregistre la figure sous figname """
+        Si un string est donné, enregistre la figure sous figname
+        Si IDlines = None, ne met pas l'identification des raies sur la figure
+        Si IDlines = str, on transforme comme IDlines = [str]
+        Si IDlines = list, il faut que les items dans la liste soient le
+        symbole atomique d'un élément (ex. Ca pour calcium)
+        Si IDlines = 'All', alors on trace toutes les raies (les 200+, à éviter
+    """
+        
+    if not isinstance(filelist, list):
+        filelist = [filelist]
 
     # Matplotlib plots
     fig, ax = plt.subplots()
@@ -267,6 +299,7 @@ def plot_spectre(filelist, figname = None):
 
     for i,inputfile in enumerate(filelist):
     
+        # On lit le spectre
         wav, flux, (imodel, inu) = load_spectre(inputfile)
         
         # Detection des unites
@@ -285,8 +318,52 @@ def plot_spectre(filelist, figname = None):
         flux = normalisation(wav, flux)
         ax.plot(wav, flux, label = basename(inputfile))
         
+    # Crée la légende
     ax.legend()
     
+    # Si des éléments ont été fournis
+    if IDlines:
+    
+        # setup pour la figure
+        xlims = ax.get_xlim()
+        tick_ymax = 0.05
+    
+        # On lit la liste de raies
+        linedict = load_lines()
+    
+        # Si on a juste un élément, on transforme en list
+        if isinstance(IDlines, str):
+            IDlines = [IDlines]
+            
+        # On sélectionne les ions que l'on veut identifier
+        matches = []
+        for ion in IDlines:
+            matches += [k for k in linedict if re.match(ion+r'[IV]+', k)]
+        
+        # Si on demande toutes les raies
+        if 'All' in IDlines:
+            matches = linedict.keys()
+                
+        # Pour chaque ion
+        for k in matches:
+            
+            # Pour chaque raie de l'ion
+            for l in linedict[k]:
+                
+                # On trace une ligne verticale
+                ax.axvline(l, ymin = 0, ymax = tick_ymax, c='k')
+                
+                # Et on indique l'ion au dessus
+                trans = ax.get_xaxis_transform()
+                ax.text(x = l, y = tick_ymax+0.01,
+                        s = k,
+                        ha = 'center',
+                        transform = trans,
+                        clip_on = True)
+                    
+        # On remet les limites précédentes
+        ax.set_xlim(xlims)
+            
     if figname is None:
         plt.show(fig)
     else:

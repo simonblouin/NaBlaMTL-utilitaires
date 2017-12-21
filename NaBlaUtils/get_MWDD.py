@@ -51,8 +51,7 @@ def get_MWDD_spectra(name):
                 x = float(x)
                 y = float(y)
             else:
-                print('Format inconnu '+spec)
-                pass
+                raise NotImplementedError('Format inconnu '+spec)
             xvec.append(x)
             yvec.append(y)
         output[spec.replace('%20', '_')] = np.array([xvec,yvec])

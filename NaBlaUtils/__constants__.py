@@ -18,7 +18,3 @@ m_p   = cst.m_p * cst.kilo                     # g
 N_A   = cst.N_A                                # mol**-1
 sigma = cst.sigma / cst.erg * cst.centi**2     # erg / cm**2 / K**4 / s
 pi    = cst.pi                                 # -
-
-
-
-

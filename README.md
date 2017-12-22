@@ -9,7 +9,28 @@ Utilitaires Python pour l'analyse et la visualisation de données relatives aux 
 
 ## Comment installer
 La distribution Python [Anaconda](https://www.anaconda.com/download/) est recommandée.
-Le reste est à venir...
+
+Dépendances:
+
+*. python 3.X
+
+*. numpy
+
+*. scipy
+
+*. pandas
+
+*. matplotlib
+
+*. astropy
+
+Installation:
+
+1. Télécharger le repo (en .zip par exemple, et extraire le répertoire NaBlaMTL-utilitaires-master)
+
+2. Dans le répertoire créé ci-haut, exécuter `python setup.py install`
+
+3. Voilà!
 
 ## Comment exécuter
 Dans un script:
